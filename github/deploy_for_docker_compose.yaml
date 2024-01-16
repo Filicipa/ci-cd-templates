@@ -1,0 +1,43 @@
+name: RPC Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - ".github/workflows/**"
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    env:
+      name: ${GITHUB_REPOSITORY#*/}
+      key: "ssh_key"
+      stamp: latest #or ${{ github.sha }}
+      host: ${{ secrets.DEV_NAME }}@${{ secrets.DEV_IP }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build docker image
+        run: |
+          docker build . -t ${{ env.name }}:${{ env.stamp }}
+
+      - name: Save docker image
+        run: |
+          docker save -o ${{ env.name }}.tar ${{ env.name }}:${{ env.stamp }}
+
+      - name: Copy image to EC2
+        run: |
+          echo "${{ secrets.DEV_SSH_KEY }}" > ${key}
+          sudo chmod 400 ${key}
+          scp -i ${key} -o "StrictHostKeyChecking no" ${{ env.name }}.tar ${{ env.host }}:${{ env.name }}.tar
+
+      - name: Start image
+        run: |
+          ssh -i ${key} -o "StrictHostKeyChecking no" ${{ env.host }} ' \
+          sudo docker load -i '${{ env.name }}'.tar && \
+          sudo docker compose -f folder/docker-compose.yaml up -d && \
+          sudo docker image prune -af'

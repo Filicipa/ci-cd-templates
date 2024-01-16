@@ -1,0 +1,50 @@
+name: Backend deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches: 
+      - dev
+    paths-ignore:
+      - '.github/workflows/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      name: ${GITHUB_REPOSITORY#*/}"-dev"
+      key: "ssh_key"
+      stamp: ${GITHUB_SHA}
+      host: ${{ secrets.DEV_NAME_IP_HOST }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+           
+      - name: Build docker image
+        run: |
+          docker build . -t ${{ env.name }}:${{ env.stamp }}
+          
+      - name: Save docker image
+        run: |
+          docker save -o ${{ env.name }}.tar ${{ env.name }}:${{ env.stamp }}
+      
+      - name: Copy image to EC2
+        run: |
+          echo "${{ secrets.DEV_SSH_KEY }}" > ${key}
+          sudo chmod 600 ${key}
+          scp -i ${key} -o "StrictHostKeyChecking no" ${{ env.name }}.tar ${{ env.host }}:${{ env.name }}.tar
+        
+      - name: Start image
+        run: |
+          ssh -i ${key} -o "StrictHostKeyChecking no" ${{ env.host }} ' \
+          sudo docker load -i '${{ env.name }}'.tar && \
+          sudo docker stop '${{ env.name }}' ; \
+          sudo docker run -d --restart always -p '${{ vars.PORT }}':'${{ vars.PORT }}' \
+          -e HOST='${{ vars.HOST }}' \
+          -e PORT='${{ vars.PORT }}' \
+          --network example_network \
+          --name '${{ env.name }}'-new '${{ env.name }}':'${{ env.stamp }}' && \
+          sudo docker rm '${{ env.name }}' && sudo docker rmi $(sudo docker images -q); \
+          sudo docker rename '${{ env.name }}'-new '${{ env.name }}' && \
+          rm '${{ env.name }}'.tar'
