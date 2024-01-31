@@ -1,4 +1,4 @@
-name: RPC Deploy
+name: Deploy
 
 on:
   workflow_dispatch:
@@ -14,7 +14,7 @@ jobs:
     env:
       name: ${GITHUB_REPOSITORY#*/}
       key: "ssh_key"
-      stamp: latest #or ${{ github.sha }}
+      tag: latest #or ${{ github.sha }}
       host: ${{ secrets.DEV_NAME }}@${{ secrets.DEV_IP }}
 
     steps:
@@ -23,11 +23,11 @@ jobs:
 
       - name: Build docker image
         run: |
-          docker build . -t ${{ env.name }}:${{ env.stamp }}
+          docker build . -t ${{ env.name }}:${{ env.tag }}
 
       - name: Save docker image
         run: |
-          docker save -o ${{ env.name }}.tar ${{ env.name }}:${{ env.stamp }}
+          docker save -o ${{ env.name }}.tar ${{ env.name }}:${{ env.tag }}
 
       - name: Copy image to EC2
         run: |
