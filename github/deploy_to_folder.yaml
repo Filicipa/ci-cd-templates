@@ -1,0 +1,57 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+jobs:
+  Build_Deploy_files:
+    runs-on: ubuntu-22.04
+    env:
+      host: ${{ secrets.DEV_HOST_NAME }}@${{ secrets.DEV_HOST_IP }}
+      key: "ssh_key"
+
+    steps:
+      - name: Add SSH key
+        run: |
+          echo "${{ secrets.DEV_SSH_KEY }}" > ${key}
+          sudo chmod 400 ${key}
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          path: "static/"
+
+      - name: Show path and files
+        run: |
+          pwd
+          ls -l
+          echo "==============================="
+          ls -l static/
+
+      - name: Install dependencies
+        run: |
+          cd static/
+          npm ci
+
+      - name: Build
+        run: |
+          cd static/
+          npm run build
+
+      - name: Copy files on DEV server
+        run: |
+          scp -i ${{ github.workspace }}/${key} -o "StrictHostKeyChecking no" \
+          -r ${{ github.workspace }}/static/dist/* \
+          ${{ env.host }}:/home/ubuntu/frontend_finance_tmp/
+
+      - name: Copy files into Nginx
+        run: |
+          ssh -i ${{ github.workspace }}/${key} -o "StrictHostKeyChecking no" ${{ env.host }} ' \
+          sudo cp -R ~/frontend_finance_tmp/* /var/www/follows.finance/public/ ; \
+          sudo chmod -R www-data:www-data /var/www/follows.finance ; \
+          sudo rm -R ~/frontend_finance_tmp/* '

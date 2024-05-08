@@ -1,2 +1,0 @@
-- name: Step
-  run: echo ${GITHUB_SHA::7}

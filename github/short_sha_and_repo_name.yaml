@@ -1,0 +1,5 @@
+- name: short sha
+  run: echo ${GITHUB_SHA::7}
+
+- name: Github repo name
+  run: echo "${GITHUB_REF##*/}"
