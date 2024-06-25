@@ -2,4 +2,7 @@
   run: echo ${GITHUB_SHA::7}
 
 - name: Github repo name
-  run: echo "${GITHUB_REF##*/}"
+  run: echo "${GITHUB_REPOSITORY##*/}"
+
+- name: Github tag name
+  run: ${GITHUB_REF#refs/*/}
